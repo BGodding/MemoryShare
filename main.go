@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"memoryShare/media"
 	"memoryShare/player"
 	"os"
@@ -29,7 +30,7 @@ type app struct {
 func main() {
 	version := flag.Bool("version", false, "prints current version and exits")
 	pathString := flag.String("media-folders", ".", "comma seperated list of folders to watch")
-	slideDuration := flag.Float64("media-duration", 4.0, "time for each media file to display in seconds")
+	slideDuration := flag.Float64("media-duration", 10.0, "time for each media file to display in seconds")
 	flag.Parse()
 
 	if *version {
@@ -94,7 +95,8 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-mediaTicker.C:
-				a.UpdateDisplay()
+				// Use dynamic timing for shorter video files or we just sit on the last frame
+				mediaTicker.Reset(a.UpdateDisplay())
 			}
 		}
 	}(&wg)
@@ -102,7 +104,7 @@ func main() {
 	wg.Wait()
 }
 
-func (a *app) UpdateDisplay() {
+func (a *app) UpdateDisplay() time.Duration {
 	for {
 		// This should only return an empty file if we don't have any media to show
 		file := a.mediaFileHandler.GetRandomFile()
@@ -114,13 +116,17 @@ func (a *app) UpdateDisplay() {
 					log.S().Error(err)
 					continue
 				} else {
-					return
+					// This check is to catch pictures
+					if file.MetaData.DurationSeconds > 2 {
+						return time.Second * time.Duration(math.Max(file.MetaData.DurationSeconds, a.slideDuration/4))
+					}
+					return time.Second * time.Duration(a.slideDuration)
 				}
 			} else if err := a.mediaPlayer.PlayVideo(file.Path, file.MetaData.DurationSeconds, a.slideDuration); err != nil {
 				log.S().Error(err)
 				continue
 			} else {
-				return
+				return time.Second * time.Duration(a.slideDuration)
 			}
 		}
 		time.Sleep(time.Second)
