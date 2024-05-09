@@ -5,14 +5,12 @@ import (
 	"io/fs"
 	"math/rand"
 	"memoryShare/watcher"
-	"os"
 	"path/filepath"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	log "go.uber.org/zap"
 	"gopkg.in/vansante/go-ffprobe.v2"
 )
 
@@ -39,13 +37,13 @@ type Media struct {
 func Init(ctx context.Context, paths []string) (*Media, error) {
 	instance := Media{}
 	instance.AddDirectories(paths)
-	if err := instance.Discover(ctx); err != nil {
-		return nil, err
-	}
 	var err error
 	instance.pendingFilePaths = make(chan string, 512)
 	instance.watchEvents = make(chan fsnotify.Event, 512)
 	if instance.watch, err = watcher.Init(paths, instance.watchEvents); err != nil {
+		return nil, err
+	}
+	if err := instance.Discover(ctx); err != nil {
 		return nil, err
 	}
 	return &instance, nil
@@ -104,21 +102,22 @@ func (m *Media) Discover(ctx context.Context) error {
 			}
 			if !d.IsDir() {
 				// Get the fileinfo
-				fileInfo, err := os.Stat(s)
-				if err != nil {
-					return err
-				}
+				// fileInfo, err := os.Stat(s)
+				// if err != nil {
+				// 	return err
+				// }
 
 				// Gives the modification time
-				modificationTime := fileInfo.ModTime()
-				log.S().Debug("Name of the file:", fileInfo.Name(),
-					" Last modified time of the file:",
-					modificationTime)
+				// modificationTime := fileInfo.ModTime()
+				// log.S().Debug("Name of the file:", fileInfo.Name(),
+				// 	" Last modified time of the file:",
+				// 	modificationTime)
 
-				if metaData, err := getMetaData(ctx, s); err == nil {
-					m.allFiles = append(m.allFiles, File{Path: s, MetaData: *metaData})
-					log.S().Debugf("%d %s %+v", len(m.allFiles), s, metaData)
-				}
+				// if metaData, err := getMetaData(ctx, s); err == nil {
+				// 	m.allFiles = append(m.allFiles, File{Path: s, MetaData: *metaData})
+				// 	log.S().Debugf("%d %s %+v", len(m.allFiles), s, metaData)
+				// }
+				m.QueueFile(s)
 			}
 			return nil
 		})

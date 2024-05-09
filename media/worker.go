@@ -2,11 +2,12 @@ package media
 
 import (
 	"context"
+
 	"github.com/fsnotify/fsnotify"
 	log "go.uber.org/zap"
 )
 
-func (m *Media) ProcessFileAsMedia(ctx context.Context, path string) error {
+func (m *Media) ProcessFileAsMedia(ctx context.Context, path string) (*File, error) {
 	m.Lock()
 	defer m.Unlock()
 	// Get the fileinfo
@@ -16,13 +17,12 @@ func (m *Media) ProcessFileAsMedia(ctx context.Context, path string) error {
 	//}
 	// Gives the modification time
 	// modificationTime := fileInfo.ModTime()
-
 	metaData, err := getMetaData(ctx, path)
 	if err == nil {
-		m.allFiles = append(m.allFiles, File{Path: path, MetaData: *metaData})
 		log.S().Debugf("%s, %+v", path, metaData)
+		return &File{Path: path, MetaData: *metaData}, err
 	}
-	return err
+	return nil, err
 }
 
 func (m *Media) QueueFile(path string) {
@@ -71,13 +71,25 @@ func (m *Media) Worker(ctx context.Context) {
 				continue
 			}
 			// TODO: Insert new files at the beginning of a queue
-			if err := m.ProcessFileAsMedia(ctx, event.Name); err != nil {
+			f, err := m.ProcessFileAsMedia(ctx, event.Name)
+			if err != nil {
 				log.S().Error(err)
+				continue
 			}
+			m.Lock()
+			m.allFiles = append(m.allFiles, *f)
+			m.newFiles = append(m.newFiles, *f)
+			m.Unlock()
 		case path := <-m.pendingFilePaths:
-			if err := m.ProcessFileAsMedia(ctx, path); err != nil {
+			f, err := m.ProcessFileAsMedia(ctx, path)
+			if err != nil {
 				log.S().Error(err)
+				continue
 			}
+			m.Lock()
+			m.allFiles = append(m.allFiles, *f)
+			m.unseenFiles = append(m.unseenFiles, *f)
+			m.Unlock()
 		}
 	}
 }
