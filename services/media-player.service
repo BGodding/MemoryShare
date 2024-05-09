@@ -1,0 +1,12 @@
+[Unit]
+After=graphical.target
+Requires=graphical.target
+
+[Service]
+Type=exec
+User=msuser
+ExecStart=/bin/sh -c "DISPLAY=:0 mpv --fs --image-display-duration=inf --idle=once --keep-open=yes --input->Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target

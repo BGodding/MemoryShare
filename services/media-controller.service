@@ -1,0 +1,13 @@
+[Unit]
+# After=media-player.service
+After=graphical.target
+Requires=graphical.target
+
+[Service]
+Type=exec
+ExecStart=memoryShare --media-folders /home/msuser/Pictures/HomePictureFrame
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
