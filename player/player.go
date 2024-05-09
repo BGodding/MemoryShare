@@ -29,7 +29,7 @@ func Init() (*Player, error) {
 func (p *Player) PlayVideo(path string, mediaLength float64, slideDuration float64) error {
 	clipStart := 0.0
 	clipLength := mediaLength
-	if mediaLength > slideDuration {
+	if mediaLength > slideDuration+1 {
 		// Generate a random start pos between 0 and end - and max length
 		clipStart = float64(rand.Intn(int(mediaLength - slideDuration)))
 		clipLength = slideDuration
