@@ -87,9 +87,10 @@ func main() {
 
 	// Inf loop of getting and displaying new media files
 	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
+	go func(wg *sync.WaitGroup, conn *mpvipc.Connection) {
 		defer wg.Done()
 		mediaTicker := time.NewTicker(time.Second * time.Duration(*slideDuration))
+		mpvEvents, mpvStop := conn.NewEventListener()
 		for {
 			select {
 			case <-ctx.Done():
@@ -97,9 +98,20 @@ func main() {
 			case <-mediaTicker.C:
 				// Use dynamic timing for shorter video files or we just sit on the last frame
 				mediaTicker.Reset(a.UpdateDisplay())
+			case event := <-mpvEvents:
+				// Watch the events to find media files that are not playing nice and remove them from rotation
+				if event.Reason == "error" {
+					log.S().Errorf("EVENT %+v", event)
+				} else {
+					log.S().Debugf("EVENT %+v", event)
+				}
+
+			case <-mpvStop:
+				log.S().Error("Received MPV stop")
 			}
 		}
-	}(&wg)
+	}(&wg, a.mediaPlayer.Conn)
+
 	// This will block until all wait group processes have called done
 	wg.Wait()
 }
