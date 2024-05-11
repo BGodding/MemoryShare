@@ -3,6 +3,7 @@ package player
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/DexterLB/mpvipc"
 )
@@ -38,6 +39,11 @@ func (p *Player) PlayVideo(path string, mediaLength float64, slideDuration float
 		// Generate a random start pos between 0 and end - and max length
 		clipStart = float64(rand.Intn(int(mediaLength - slideDuration)))
 		clipLength = slideDuration
+	}
+	// EDL names cannot contain  characters `,;=`
+	if strings.ContainsAny(path, ",;=") {
+		return fmt.Errorf("%q is an invalid path as it contains ',;='", path)
+
 	}
 	if _, err := p.Conn.Call("loadfile", fmt.Sprintf("edl://%s,start=%d,length=%d", path, int(clipStart), int(clipLength))); err != nil {
 		return err
