@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -97,7 +98,8 @@ func main() {
 				return
 			case <-mediaTicker.C:
 				// Use dynamic timing for shorter video files or we just sit on the last frame
-				mediaTicker.Reset(a.UpdateDisplay())
+				delayUntilNextUpdate, _ := a.UpdateDisplay()
+				mediaTicker.Reset(delayUntilNextUpdate)
 			case event := <-mpvEvents:
 				// Watch the events to find media files that are not playing nice and remove them from rotation
 				if event.Reason == "error" {
@@ -116,31 +118,30 @@ func main() {
 	wg.Wait()
 }
 
-func (a *app) UpdateDisplay() time.Duration {
-	for {
-		// This should only return an empty file if we don't have any media to show
-		file := a.mediaFileHandler.GetRandomFile()
-		log.S().Debugf("%+v", file)
-		if file.Path != "" {
-			log.S().Debugf("playing media path %#q duration %fs", file.Path, file.MetaData.DurationSeconds)
-			if file.MetaData.DurationSeconds < a.slideDuration {
-				if err := a.mediaPlayer.PlayImage(file.Path); err != nil {
-					log.S().Error(err)
-					continue
-				} else {
-					// This check is to catch pictures
-					if file.MetaData.DurationSeconds > 2 {
-						return time.Second * time.Duration(math.Max(file.MetaData.DurationSeconds, a.slideDuration/4))
-					}
-					return time.Second * time.Duration(a.slideDuration)
-				}
-			} else if err := a.mediaPlayer.PlayVideo(file.Path, file.MetaData.DurationSeconds, a.slideDuration); err != nil {
-				log.S().Error(err)
-				continue
+func (a *app) UpdateDisplay() (time.Duration, error) {
+	// This should only return an empty file if we don't have any media to show
+	file := a.mediaFileHandler.GetRandomFile()
+	log.S().Debugf("%+v", file)
+	if file.Path != "" {
+		log.S().Debugf("playing media path %#q duration %fs", file.Path, file.MetaData.DurationSeconds)
+		if file.MetaData.DurationSeconds > a.slideDuration || !strings.ContainsAny(file.Path, ",;=") {
+			if err := a.mediaPlayer.PlayVideo(file.Path, file.MetaData.DurationSeconds, a.slideDuration); err != nil {
+				return time.Millisecond * 250, err
 			} else {
-				return time.Second * time.Duration(a.slideDuration)
+				return time.Second * time.Duration(a.slideDuration), nil
+			}
+		} else if file.MetaData.DurationSeconds < a.slideDuration*1.5 {
+			if err := a.mediaPlayer.PlayImage(file.Path); err != nil {
+				log.S().Error(err)
+				return time.Millisecond * 250, err
+			} else {
+				// This check is to catch pictures
+				if file.MetaData.DurationSeconds > 2 {
+					return time.Second * time.Duration(math.Max(file.MetaData.DurationSeconds, a.slideDuration/4)), nil
+				}
+				return time.Second * time.Duration(a.slideDuration), nil
 			}
 		}
-		time.Sleep(time.Second)
 	}
+	return time.Second, errors.New("no media available")
 }
