@@ -60,17 +60,6 @@ func main() {
 	//	log.S().Info(http.ListenAndServe("localhost:6060", nil))
 	//}()
 
-	a.mediaFileHandler, err = media.Init(ctx, strings.Split(*pathString, ","))
-	if err != nil {
-		log.S().Fatal(err)
-	}
-	go func() {
-		err := a.mediaFileHandler.Run(ctx)
-		if err != nil {
-			log.S().Error(err)
-		}
-	}()
-
 	a.mediaPlayer, err = player.Init()
 	if err != nil {
 		log.S().Fatal(err)
@@ -81,6 +70,17 @@ func main() {
 			log.S().Error(err)
 		}
 	}(a.mediaPlayer.Conn)
+
+	a.mediaFileHandler, err = media.Init(ctx, strings.Split(*pathString, ","))
+	if err != nil {
+		log.S().Fatal(err)
+	}
+	go func() {
+		err := a.mediaFileHandler.Run(ctx)
+		if err != nil {
+			log.S().Error(err)
+		}
+	}()
 
 	// Load some initial content right away
 	a.UpdateDisplay()
