@@ -27,6 +27,11 @@ func Init() (*Player, error) {
 
 // Will pick and play a random subset of the video file if the media length is greater than the slide duration
 func (p *Player) PlayVideo(path string, mediaLength float64, slideDuration float64) error {
+	if p.Conn.IsClosed() {
+		if err := p.Conn.Open(); err != nil {
+			return err
+		}
+	}
 	clipStart := 0.0
 	clipLength := mediaLength
 	if mediaLength > slideDuration+1 {
@@ -41,6 +46,11 @@ func (p *Player) PlayVideo(path string, mediaLength float64, slideDuration float
 }
 
 func (p *Player) PlayImage(path string) error {
+	if p.Conn.IsClosed() {
+		if err := p.Conn.Open(); err != nil {
+			return err
+		}
+	}
 	_, err := p.Conn.Call("loadfile", path)
 	return err
 }
