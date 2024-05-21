@@ -20,7 +20,7 @@ import (
 	log "go.uber.org/zap"
 )
 
-const AppVersion = "0.0.1"
+const AppVersion = "0.0.2"
 
 type app struct {
 	mediaFileHandler *media.Media
@@ -124,7 +124,7 @@ func (a *app) UpdateDisplay() (time.Duration, error) {
 	log.S().Debugf("%+v", file)
 	if file.Path != "" {
 		log.S().Debugf("playing media path %#q duration %fs", file.Path, file.MetaData.DurationSeconds)
-		if file.MetaData.DurationSeconds > a.slideDuration || !strings.ContainsAny(file.Path, ",;=") {
+		if file.MetaData.DurationSeconds > a.slideDuration && !strings.ContainsAny(file.Path, ",;=") {
 			if err := a.mediaPlayer.PlayVideo(file.Path, file.MetaData.DurationSeconds, a.slideDuration); err != nil {
 				return time.Millisecond * 250, err
 			} else {

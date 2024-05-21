@@ -91,7 +91,7 @@ func (m *Media) GetRandomFile() File {
 	return selectedFile
 }
 
-// Take in a list of file paths and return with meta data on all media files
+// Take in a list of file paths and return with metadata on all media files
 func (m *Media) Discover(ctx context.Context) error {
 	m.Lock()
 	defer m.Unlock()

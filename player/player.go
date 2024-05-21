@@ -57,6 +57,8 @@ func (p *Player) PlayImage(path string) error {
 			return err
 		}
 	}
-	_, err := p.Conn.Call("loadfile", path)
-	return err
+	if _, err := p.Conn.Call("loadfile", path); err != nil {
+		return err
+	}
+	return p.Conn.Set("pause", false)
 }

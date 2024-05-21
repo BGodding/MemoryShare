@@ -1,13 +1,14 @@
 [Unit]
+Description=Curates files for the media player service
 # After=media-player.service
 After=graphical.target
 Requires=graphical.target
 
 [Service]
 Type=exec
-ExecStart=memoryShare --media-folders /home/msuser/Pictures/HomePictureFrame
+ExecStart=memoryShare --media-folders @@MEDIA_FOLDERS@@
 Restart=on-failure
-RestartSec=10
+RestartSec=5
 
 [Install]
 WantedBy=graphical.target

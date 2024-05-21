@@ -44,7 +44,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			return fmt.Errorf("%q: %s", p, err)
 		}
 	}
-	return w.dedupLoop(ctx)
+	return w.dedupeLoop(ctx)
 }
 
 func (w *Watcher) AddPath(path string) error {
@@ -57,7 +57,7 @@ func (w *Watcher) RemovePath(path string) error {
 	return nil
 }
 
-func (w *Watcher) dedupLoop(ctx context.Context) error {
+func (w *Watcher) dedupeLoop(ctx context.Context) error {
 	var (
 		// Wait 100ms for new events; each new event resets the timer.
 		waitFor = 1000 * time.Millisecond
