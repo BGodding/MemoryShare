@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/DexterLB/mpvipc"
+	"github.com/dexterlb/mpvipc"
 )
 
 type Player struct {

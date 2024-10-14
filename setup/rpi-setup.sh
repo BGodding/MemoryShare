@@ -1,11 +1,21 @@
 #!/bin/bash
 
+# Don't allow setup if the .env file is not found
+if [ ! -f .env ]; then
+    echo ".env file not found, please add then retry setup"
+    exit 1
+fi
+
 # Import vars from .env file
 set -a; source .env; set +a
 
-workingDirectory="${WORKING_DIRECTORY:-$HOME}"
+mediaDirectory="${MEDIA_DIRECTORY:-$HOME\mediasync}"
 hostname="${HOSTNAME:-$(hostname -s)}"
-echo "Running setup with working directory set to $workingDirectory and a hostname of $hostname"
+echo "Running setup with the media directory set to $mediaDirectory and a hostname of $hostname"
+
+if [ ! -f "$mediaDirectory" ]; then
+  mkdir -p "$mediaDirectory" || { echo "Failed to make missing media directory $mediaDirectory" ; exit 1; }
+fi
 
 # Install updates and needed packages
 sudo apt-get update
@@ -39,8 +49,9 @@ if [ ! -f /usr/local/bin/media-sync.sh ]; then
   echo "Installing media sync helper script"
   cat << EOF >> media-sync.sh
 #!/bin/bash
-rclone sync mediasync:album/HomePictureFrame $workingDirectory/Pictures
-# rclone sync mediasync:media/by-year $workingDirectory/Pictures
+# --rc should prevent overlapping cron jobs as the previous process will be occupying the port
+rclone sync --rc mediasync:album/HomePictureFrame $mediaDirectory
+# rclone sync mediasync:media/by-year $mediaDirectory
 EOF
   chmod +x media-sync.sh
   sudo mv media-sync.sh /usr/local/bin/media-sync.sh
@@ -51,7 +62,7 @@ cat << EOF >> crons
 # m h  dom mon dow   command
 00 23 * * * /usr/local/bin/screenoff.sh
 00 06 * * * sudo shutdown -r now
-5 * * * * /usr/local/bin/media-sync.sh
+*/5 * * * * /usr/local/bin/media-sync.sh
 EOF
 crontab crons
 rm crons
@@ -90,17 +101,18 @@ sudo systemctl enable media-controller.service
 sudo systemctl start media-player.service
 sudo systemctl start media-controller.service
 echo Install and setup rclone with 'sudo -v ; curl https://rclone.org/install.sh | sudo bash'
-# echo then run 'sudo systemctl start media-sync.service'
+echo Note that the remote must be named 'mediasync' when configuring rclone and the target album in google photos must be named 'HomePictureFrame'.
+echo This can be customized by changing the contents of '/usr/local/bin/media-sync.sh'
+echo Then run 'sudo systemctl start media-sync.service'
 
-# Disable image wallpaper in favor of a soild color
+# Disable image wallpaper in favor of a solid color
 DISPLAY=:0 pcmanfm --wallpaper-mode=color
 
 # Set desktop color to black and hide default icons
 sed -e "/^desktop_bg=/c\desktop_bg=#000000" \
     -e "/^show_trash=/c\show_trash=0" \
     -e "/^show_mounts=/c\show_mounts=0" \
-    -i  ~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf
-
+    -i  ~/.config/pcmanfm/LXDE-pi/desktop-items-*.conf
 
 # Simplify and auto hide the menu bar, disable notifications
 if ! grep -q " autohide=true" ~/.config/wf-panel-pi.ini ; then
@@ -117,8 +129,17 @@ fi
 
 # Sets UI to dark theme
 if [ ! -f /etc/environment ]; then
-  echo "Settting dark theme"
+  echo "Setting dark theme"
   cat << EOF >> /etc/environment
 GTK_THEME=Adwaita-dark
 EOF
+fi
+
+# If the WireGuard conf values are defined configure WG
+if [ ! -f /etc/wireguard/wg0.conf ] && [ -f wg.conf ]; then
+  echo "Configuring WireGuard"
+  mkdir /etc/wireguard/
+  sudo mv wg.conf /etc/wireguard/wg0.conf
+  sudo systemctl enable wg-quick@wg0.service
+  sudo systemctl start wg-quick@wg0.service
 fi

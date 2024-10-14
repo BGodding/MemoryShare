@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DexterLB/mpvipc"
+	"github.com/dexterlb/mpvipc"
 	log "go.uber.org/zap"
 )
 
