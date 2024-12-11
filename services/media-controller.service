@@ -6,6 +6,7 @@ Requires=graphical.target
 
 [Service]
 Type=exec
+User=msuser
 ExecStart=memoryShare --media-folders @@MEDIA_FOLDERS@@
 Restart=on-failure
 RestartSec=5
