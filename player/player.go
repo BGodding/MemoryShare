@@ -3,7 +3,6 @@ package player
 import (
 	"context"
 	"fmt"
-	log "go.uber.org/zap"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dexterlb/mpvipc"
+	log "go.uber.org/zap"
 )
 
 type Player struct {
@@ -39,19 +39,17 @@ func (p *Player) PlayVideoClip(path string, mediaLength float64, slideDuration f
 		}
 	}
 	clipStart := 0.0
-	clipLength := mediaLength
 	if mediaLength > slideDuration+1 {
 		// Generate a random start pos between 0 and end - and max length
 		clipStart = float64(rand.Intn(int(mediaLength - slideDuration)))
-		clipLength = slideDuration
 	}
-	log.S().Infof("playing video clip %#q from %fs to %fs of %fs ", path, clipStart, clipStart+clipLength, mediaLength)
+	log.S().Infof("playing video clip %#q from %fs to %fs of %fs ", path, clipStart, clipStart+slideDuration, mediaLength)
 	// EDL names cannot contain  characters `,;=`
 	if strings.ContainsAny(path, ",;=") {
 		return fmt.Errorf("%q is an invalid path as it contains ',;='", path)
 
 	}
-	if _, err := p.Conn.Call("loadfile", fmt.Sprintf("edl://%s,start=%d,length=%d", path, int(clipStart), int(clipLength))); err != nil {
+	if _, err := p.Conn.Call("loadfile", fmt.Sprintf("edl://%s,start=%d,length=%d", path, int(clipStart), int(slideDuration))); err != nil {
 		return err
 	}
 	return p.Conn.Set("pause", false)
@@ -71,7 +69,7 @@ func (p *Player) PlayVideo(path string) error {
 
 func (p *Player) PlayImage(path string, slideDuration float64) error {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(slideDuration)+time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(slideDuration)+(time.Millisecond*250))
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "feh", "-Z", "-Y", "-F", path)
 		cmd.Env = append(os.Environ(), "DISPLAY=:0")

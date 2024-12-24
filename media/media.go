@@ -38,8 +38,8 @@ func Init(ctx context.Context, paths []string) (*Media, error) {
 	instance := Media{}
 	instance.AddDirectories(paths)
 	var err error
-	instance.pendingFilePaths = make(chan string, 512)
-	instance.watchEvents = make(chan fsnotify.Event, 512)
+	instance.pendingFilePaths = make(chan string, 8192)
+	instance.watchEvents = make(chan fsnotify.Event, 64)
 	if instance.watch, err = watcher.Init(paths, instance.watchEvents); err != nil {
 		return nil, err
 	}

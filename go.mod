@@ -6,7 +6,7 @@ require (
 	github.com/dexterlb/mpvipc v0.0.0-20241005113212-7cdefca0e933
 	github.com/fsnotify/fsnotify v1.8.0
 	go.uber.org/zap v1.27.0
-	gopkg.in/vansante/go-ffprobe.v2 v2.2.0
+	gopkg.in/vansante/go-ffprobe.v2 v2.2.1
 )
 
 require (
