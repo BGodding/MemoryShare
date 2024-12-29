@@ -10,6 +10,7 @@ import (
 	"memoryShare/player"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -18,20 +19,24 @@ import (
 
 	"github.com/dexterlb/mpvipc"
 	log "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-const AppVersion = "0.0.2"
+const AppVersion = "0.0.3"
 
 type app struct {
 	mediaFileHandler *media.Media
 	mediaPlayer      *player.Player
 	slideDuration    float64
+	videoDuration    float64
 }
 
 func main() {
 	version := flag.Bool("version", false, "prints current version and exits")
 	pathString := flag.String("media-folders", ".", "comma seperated list of folders to watch")
-	slideDuration := flag.Float64("media-duration", 10.0, "time for each media file to display in seconds")
+	splashScreenPath := flag.String("splash-screen", "", "path to a media file to display when no other media is available")
+	slideDuration := flag.Float64("media-duration", 12.0, "time for each media file to display in seconds")
+	logLevel := flag.String("log-level", "info", "Level to log at")
 	flag.Parse()
 
 	if *version {
@@ -47,10 +52,16 @@ func main() {
 	var a app
 	var err error
 	a.slideDuration = *slideDuration
+	a.videoDuration = a.slideDuration * 1.5
 
 	// Setup logging
-	logger := log.Must(log.NewDevelopmentConfig().Build())
-	// logger := log.Must(log.NewProductionConfig().Build())
+	logConfig := log.NewDevelopmentConfig()
+	level, err := zapcore.ParseLevel(*logLevel)
+	if err != nil {
+		level = zapcore.InfoLevel
+	}
+	logConfig.Level = log.NewAtomicLevelAt(level)
+	logger := log.Must(logConfig.Build())
 	defer logger.Sync()
 
 	undo := log.ReplaceGlobals(logger)
@@ -83,8 +94,13 @@ func main() {
 		}
 	}()
 
+	var splashFile *media.File
+	if *splashScreenPath != "" {
+		splashFile, _ = a.mediaFileHandler.ProcessFileAsMedia(ctx, *splashScreenPath)
+	}
+
 	// Load some initial content right away
-	a.UpdateDisplay()
+	a.UpdateDisplay(splashFile)
 
 	// Inf loop of getting and displaying new media files
 	wg.Add(1)
@@ -98,7 +114,7 @@ func main() {
 				return
 			case <-mediaTicker.C:
 				// Use dynamic timing for shorter video files or we just sit on the last frame
-				delayUntilNextUpdate, _ := a.UpdateDisplay()
+				delayUntilNextUpdate, _ := a.UpdateDisplay(splashFile)
 				mediaTicker.Reset(delayUntilNextUpdate)
 			case event := <-mpvEvents:
 				// Watch the events to find media files that are not playing nice and remove them from rotation
@@ -118,29 +134,37 @@ func main() {
 	wg.Wait()
 }
 
-func (a *app) UpdateDisplay() (time.Duration, error) {
+func (a *app) UpdateDisplay(splashMedia *media.File) (time.Duration, error) {
 	// This should only return an empty file if we don't have any media to show
 	file := a.mediaFileHandler.GetRandomFile()
-	log.S().Debugf("%+v", file)
+	if file.Path == "" && splashMedia != nil {
+		file = *splashMedia
+	}
+
 	if file.Path != "" {
-		log.S().Debugf("playing media path %#q duration %fs", file.Path, file.MetaData.DurationSeconds)
-		if file.MetaData.DurationSeconds > a.slideDuration && !strings.ContainsAny(file.Path, ",;=") {
-			if err := a.mediaPlayer.PlayVideo(file.Path, file.MetaData.DurationSeconds, a.slideDuration); err != nil {
-				return time.Millisecond * 250, err
-			} else {
-				return time.Second * time.Duration(a.slideDuration), nil
-			}
-		} else if file.MetaData.DurationSeconds < a.slideDuration*1.5 {
-			if err := a.mediaPlayer.PlayImage(file.Path); err != nil {
+		log.S().Infof("playing media path %#q duration %fs", file.Path, file.MetaData.DurationSeconds)
+		if file.MetaData.DurationSeconds < .1 {
+			if err := a.mediaPlayer.PlayImage(file.Path, a.slideDuration); err != nil {
 				log.S().Error(err)
-				return time.Millisecond * 250, err
+				return time.Millisecond * 100, err
 			} else {
-				// This check is to catch pictures
-				if file.MetaData.DurationSeconds > 2 {
-					return time.Second * time.Duration(math.Max(file.MetaData.DurationSeconds, a.slideDuration/4)), nil
-				}
 				return time.Second * time.Duration(a.slideDuration), nil
 			}
+		} else if file.MetaData.DurationSeconds > a.videoDuration && !strings.ContainsAny(file.Path, ",;=") {
+			if err := a.mediaPlayer.PlayVideoClip(file.Path, file.MetaData.DurationSeconds, a.videoDuration); err != nil {
+				return time.Millisecond * 100, err
+			} else {
+				return time.Second * time.Duration(a.videoDuration), nil
+			}
+		} else if file.MetaData.DurationSeconds <= a.videoDuration {
+			if err := a.mediaPlayer.PlayVideo(file.Path); err != nil {
+				log.S().Error(err)
+				return time.Millisecond * 100, err
+			}
+			// Handle an awkward short video
+			return time.Second * time.Duration(math.Max(file.MetaData.DurationSeconds, a.videoDuration/4)), nil
+		} else {
+			return time.Millisecond * 100, fmt.Errorf("unable to play media file %#q", filepath.Base(file.Path))
 		}
 	}
 	return time.Second, errors.New("no media available")

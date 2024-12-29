@@ -1,0 +1,11 @@
+# Ifyou do not understand what anything below means, https://github.com/pirate/wireguard-docs is a great resource for learning
+[Interface]
+Address = <REPLACE_WITH_CLIENT_IP>/32
+PrivateKey = <REPLACE_WITH_CLIENT_PRIVATE_KEY>
+
+[Peer]
+PublicKey = <REPLACE_WITH_SERVER_PUBLIC_KEY>
+# Here I have reserved 16 IP addresses for control devices
+AllowedIPs = <REPLACE_WITH_START_OF_CONTROLLER_IP>/28
+Endpoint = <SERVER IP>:<SERVER PORT>
+PersistentKeepalive = 25

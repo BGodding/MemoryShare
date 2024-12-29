@@ -30,6 +30,8 @@ go build -ldflags "-w"
 ## Scp files
 ```shell
 scp memoryShare setup\rpi-setup.sh services\media-controller.service services\media-player.service msuser@<hostname or ip>:~
+dos2unix rpi-setup.sh
+chmod +x rpi-setup.sh
 sudo -v ; ./rpi-setup.sh
 ```
 
@@ -42,6 +44,7 @@ over_voltage_delta=25000
 # Set the Arm A76 core frequency (in MHz; default 2400).
 arm_freq=2800
 ```
+For more information on improving performance see https://www.jeffgeerling.com/blog/2024/raspberry-pi-boosts-pi-5-performance-sdram-tuning
 The lines below can help in validating stability
 ```
 sudo apt install stress-ng mesa-utils

@@ -11,6 +11,8 @@ set -a; source .env; set +a
 
 mediaDirectory="${MEDIA_DIRECTORY:-$HOME\mediasync}"
 hostname="${HOSTNAME:-$(hostname -s)}"
+mediaAlbumName="${MEDIA_ALBUM_NAME:-HomePictureFrame}"
+
 echo "Running setup with the media directory set to $mediaDirectory and a hostname of $hostname"
 
 if [ ! -f "$mediaDirectory" ]; then
@@ -20,8 +22,13 @@ fi
 # Install updates and needed packages
 sudo apt-get update
 sudo apt-get -qy upgrade
-sudo apt-get -qy install mpv unattended-upgrades gpg prometheus-node-exporter wireguard
+sudo apt-get -qy install mpv feh unattended-upgrades gpg prometheus-node-exporter wireguard
 sudo apt-get -qy autoclean
+
+# Set scaling governor to performance
+# TODO: This is not sticky
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
     echo "Generating SSH key"
     ssh-keygen -t ed25519 -C "$hostname" -q -f "$HOME/.ssh/id_ed25519" -N ""
@@ -30,16 +37,14 @@ fi
 # Enable the ability to turns the screen off
 if ! grep -q " vc4.force_hotplug=1" /boot/firmware/cmdline.txt ; then
   echo "Modifying /boot/firmware/cmdline.txt"
-  sudo bash -c "echo -n ' vc4.force_hotplug=1' >> /boot/firmware/cmdline.txt"
+  sudo bash -c "echo -n ' vc4.force_hotplug=1 video=HDMI-A-1:2560x1440M@60,rotate=180' >> /boot/firmware/cmdline.txt"
 fi
 
 if [ ! -f /usr/local/bin/screenoff.sh ]; then
   echo "Installing screen off helper script"
   cat << EOF >> screenoff.sh
 #!/bin/bash
-export WAYLAND_DISPLAY=wayland-1
-export XDG_RUNTIME_DIR=/run/user/1000
-/usr/bin/wlr-randr --output HDMI-A-1 --off
+/bin/bash -c "XDG_RUNTIME_DIR=/run/user/1000 /usr/bin/wlr-randr --output HDMI-A-1 --off"
 EOF
   chmod +x screenoff.sh
   sudo mv screenoff.sh /usr/local/bin/screenoff.sh
@@ -50,7 +55,7 @@ if [ ! -f /usr/local/bin/media-sync.sh ]; then
   cat << EOF >> media-sync.sh
 #!/bin/bash
 # --rc should prevent overlapping cron jobs as the previous process will be occupying the port
-rclone sync --rc mediasync:album/HomePictureFrame $mediaDirectory
+rclone sync --rc mediasync:album/$mediaAlbumName $mediaDirectory
 # rclone sync mediasync:media/by-year $mediaDirectory
 EOF
   chmod +x media-sync.sh
@@ -143,3 +148,17 @@ if [ ! -f /etc/wireguard/wg0.conf ] && [ -f wg.conf ]; then
   sudo systemctl enable wg-quick@wg0.service
   sudo systemctl start wg-quick@wg0.service
 fi
+
+# Sets up an AP for WIFI configuration
+wget https://davesteele.github.io/comitup/deb/davesteele-comitup-apt-source_1.2_all.deb
+sudo dpkg -i --force-all davesteele-comitup-apt-source_1.2_all.deb
+rm davesteele-comitup-apt-source_1.2_all.deb
+sudo apt-get update
+sudo apt-get -qy install comitup comitup-watch
+rm /etc/network/interfaces
+sudo systemctl mask dnsmasq.service
+sudo systemctl mask systemd-resolved.service
+sudo systemctl mask dhcpd.service
+sudo systemctl mask dhcpcd.service
+sudo systemctl mask wpa-supplicant.service
+sudo systemctl enable NetworkManager.service
