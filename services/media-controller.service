@@ -2,7 +2,6 @@
 Description=Curates files for the media player service
 # After=media-player.service
 After=graphical.target
-Requires=graphical.target
 
 [Service]
 Type=exec

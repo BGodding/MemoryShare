@@ -69,7 +69,7 @@ func (p *Player) PlayVideo(path string) error {
 
 func (p *Player) PlayImage(path string, slideDuration float64) error {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(slideDuration)+(time.Millisecond*250))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(slideDuration)+(time.Millisecond*500))
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "feh", "-Z", "-Y", "-F", path)
 		cmd.Env = append(os.Environ(), "DISPLAY=:0")

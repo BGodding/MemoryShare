@@ -1,7 +1,6 @@
 [Unit]
 Description=Media player socket for external control
 After=graphical.target
-Requires=graphical.target
 
 [Service]
 Type=exec

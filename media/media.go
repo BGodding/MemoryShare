@@ -7,10 +7,12 @@ import (
 	"memoryShare/watcher"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	log "go.uber.org/zap"
 	"gopkg.in/vansante/go-ffprobe.v2"
 )
 
@@ -32,6 +34,7 @@ type Media struct {
 	pendingFilePaths chan string
 	watch            *watcher.Watcher
 	watchEvents      chan fsnotify.Event
+	playStartTime    time.Time
 }
 
 func Init(ctx context.Context, paths []string) (*Media, error) {
@@ -50,6 +53,7 @@ func Init(ctx context.Context, paths []string) (*Media, error) {
 }
 
 func (m *Media) Run(ctx context.Context) error {
+	m.playStartTime = time.Now()
 	go m.Worker(ctx)
 	return m.watch.Run(ctx)
 }
@@ -79,6 +83,8 @@ func (m *Media) GetRandomFile() File {
 		selectedFile = m.unseenFiles[selectedIndex]
 		m.unseenFiles = append(m.unseenFiles[:selectedIndex], m.unseenFiles[selectedIndex+1:]...)
 	} else if len(m.allFiles) > 0 {
+		log.S().Warnf("Finished playlist, duration was %s total items re-added %d", time.Since(m.playStartTime).String(), len(m.allFiles))
+		m.playStartTime = time.Now()
 		m.unseenFiles = nil
 		m.unseenFiles = make([]File, len(m.allFiles))
 		copy(m.unseenFiles, m.allFiles)
@@ -117,7 +123,10 @@ func (m *Media) Discover(ctx context.Context) error {
 				// 	m.allFiles = append(m.allFiles, File{Path: s, MetaData: *metaData})
 				// 	log.S().Debugf("%d %s %+v", len(m.allFiles), s, metaData)
 				// }
-				m.QueueFile(s)
+				// rclone uses files with the ext .partial for partial transfers, ignore these
+				if !strings.Contains(filepath.Ext(s), ".partial") {
+					m.QueueFile(s)
+				}
 			}
 			return nil
 		})
