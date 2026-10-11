@@ -20,17 +20,35 @@ type Player struct {
 	RunOnce bool
 }
 
-func Init() (*Player, error) {
+// socketWaitTimeout bounds how long Init waits for mpv's IPC socket. mpv is
+// started by its own service alongside this one, so on boot the socket often
+// doesn't exist yet when Init first tries to connect.
+const socketWaitTimeout = 30 * time.Second
+
+// socketRetryInterval is the delay between connection attempts in Init.
+const socketRetryInterval = 500 * time.Millisecond
+
+func Init(ctx context.Context) (*Player, error) {
 	p := Player{}
 	// TODO: Also start MPV from here?
 	// MPV must be started with the command below
 	// mpv --image-display-duration=inf --idle=once --keep-open=yes --input-ipc-server=/tmp/mpv_socket
 	p.Conn = mpvipc.NewConnection("/tmp/mpv_socket")
-	err := p.Conn.Open()
-	if err != nil {
-		return nil, err
+
+	ctx, cancel := context.WithTimeout(ctx, socketWaitTimeout)
+	defer cancel()
+	for {
+		err := p.Conn.Open()
+		if err == nil {
+			return &p, nil
+		}
+		log.S().Debugf("waiting for mpv: %s", err)
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(socketRetryInterval):
+		}
 	}
-	return &p, nil
 }
 
 // Will pick and play a random subset of the video file if the media length is greater than the slide duration

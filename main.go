@@ -22,7 +22,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const AppVersion = "1.0.0"
+const AppVersion = "1.1.0"
 
 type app struct {
 	mediaFileHandler *media.Media
@@ -72,7 +72,7 @@ func main() {
 	//	log.S().Info(http.ListenAndServe("localhost:6060", nil))
 	//}()
 
-	a.mediaPlayer, err = player.Init()
+	a.mediaPlayer, err = player.Init(ctx)
 	if err != nil {
 		log.S().Fatal(err)
 	}

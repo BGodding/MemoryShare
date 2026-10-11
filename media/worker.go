@@ -2,6 +2,7 @@ package media
 
 import (
 	"context"
+	"fmt"
 	"mantel/feh"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	log "go.uber.org/zap"
+	"gopkg.in/vansante/go-ffprobe.v2"
 )
 
 func (m *Media) ProcessFileAsMedia(ctx context.Context, path string) (*File, error) {
@@ -22,16 +24,23 @@ func (m *Media) ProcessFileAsMedia(ctx context.Context, path string) (*File, err
 	// Gives the modification time
 	// modificationTime := fileInfo.ModTime()
 	metaData, err := getMetaData(ctx, path)
-	if err == nil {
-		if IsImage(metaData.DurationSeconds) {
-			if err := validateImage(ctx, path); err != nil {
-				return nil, err
-			}
+	if err != nil {
+		// ffprobe can't read some still-image formats feh can display (e.g.
+		// HEIC with Bookworm's ffmpeg 5.1), so fall back to playing the file
+		// as an image if feh can load it.
+		if fehErr := validateImage(ctx, path); fehErr != nil {
+			return nil, fmt.Errorf("unsupported media file %s: ffprobe: %w; %w", path, err, fehErr)
 		}
-		log.S().Debugf("%s, %+v", path, metaData)
-		return &File{Path: path, MetaData: *metaData}, err
+		log.S().Debugf("%s, ffprobe failed (%s), treating as image", path, err)
+		return &File{Path: path, MetaData: ffprobe.Format{Filename: path}}, nil
 	}
-	return nil, err
+	if IsImage(metaData.DurationSeconds) {
+		if err := validateImage(ctx, path); err != nil {
+			return nil, err
+		}
+	}
+	log.S().Debugf("%s, %+v", path, metaData)
+	return &File{Path: path, MetaData: *metaData}, nil
 }
 
 // validateImage confirms feh (the image viewer the player package uses for
